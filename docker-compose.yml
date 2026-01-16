@@ -1,0 +1,43 @@
+version: '3.8'
+
+#===============================================================================
+# AI 情报员 - n8n 服务配置
+# 注意：Dify 使用官方仓库的 docker-compose，单独启动
+#===============================================================================
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      # 基础配置
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5678/}
+      # 时区
+      - GENERIC_TIMEZONE=${TIMEZONE:-Asia/Shanghai}
+      - TZ=${TIMEZONE:-Asia/Shanghai}
+      # 认证配置
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE:-true}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-changeme123}
+      # 执行配置
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+    networks:
+      - ai-intel-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  ai-intel-network:
+    driver: bridge
