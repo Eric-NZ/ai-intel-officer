@@ -9,13 +9,13 @@
 ### Linux / macOS
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Eric-NZ/wechat-posts/master/ai-intel-officer/setup.sh | bash
+curl -fsSL https://github.com/Eric-NZ/ai-intel-officer/blob/master/setup.sh | bash
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/Eric-NZ/wechat-posts.git
+git clone https://github.com/Eric-NZ/ai-intel-officer.git
 cd wechat-posts/ai-intel-officer
 docker compose up -d
 ```
@@ -37,4 +37,4 @@ docker compose up -d
 
 ## 系列教程
 
-详见：[AI 情报员系列文章](../AI情报员系列教程规划.md)
+详见：[AI 情报员系列文章](https://mp.weixin.qq.com/mp/appmsgalbum?__biz=MzAwNzAxNDY0MA==&action=getalbum&album_id=4344831897529696260#wechat_redirect)

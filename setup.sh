@@ -2,7 +2,7 @@
 
 #===============================================================================
 # AI 情报员 - 一键部署脚本
-# 项目地址：https://github.com/Eric-NZ/wechat-posts/tree/master/ai-intel-officer
+# 项目地址：https://github.com/Eric-NZ/ai-intel-officer.git
 #===============================================================================
 
 set -e
@@ -72,7 +72,7 @@ setup_directories() {
 download_configs() {
     info "下载配置文件..."
 
-    BASE_URL="https://raw.githubusercontent.com/Eric-NZ/wechat-posts/master/ai-intel-officer"
+    BASE_URL="https://github.com/Eric-NZ/ai-intel-officer"
 
     # 下载 docker-compose.yml
     curl -fsSL "$BASE_URL/docker-compose.yml" -o docker-compose.yml
@@ -146,7 +146,6 @@ print_access_info() {
     echo "╚═══════════════════════════════════════════════════════════╝"
     echo ""
     echo "下一步：访问 Dify 创建管理员账号，然后接入 DeepSeek API"
-    echo "教程地址：https://github.com/Eric-NZ/wechat-posts"
     echo ""
 }
 
