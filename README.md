@@ -27,6 +27,7 @@ docker compose up -d
 | `setup.sh` | 一键部署脚本 |
 | `docker-compose.yml` | n8n 服务配置 |
 | `.env.example` | 环境变量模板 |
+| `workflows/n8n-workflow-rss.json` | RSS 采集工作流（第 4 篇配套） |
 
 ## 访问地址
 

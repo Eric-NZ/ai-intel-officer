@@ -1,0 +1,147 @@
+{
+  "name": "RSS采集-Hacker News",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [250, 300],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "url": "https://hnrss.org/frontpage"
+      },
+      "name": "RSS Read",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [450, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const fs = require('fs');\nconst path = '/home/node/.n8n/processed_urls.json';\n\nlet processedUrls = [];\ntry {\n  const data = fs.readFileSync(path, 'utf8');\n  processedUrls = JSON.parse(data);\n} catch (e) {\n  processedUrls = [];\n}\n\nconst items = $input.all();\nconst newItems = [];\nconst newUrls = [];\n\nfor (const item of items) {\n  const url = item.json.link;\n  if (!processedUrls.includes(url)) {\n    newItems.push(item);\n    newUrls.push(url);\n  }\n}\n\nif (newUrls.length > 0) {\n  const updatedUrls = [...processedUrls, ...newUrls];\n  const trimmedUrls = updatedUrls.slice(-1000);\n  fs.writeFileSync(path, JSON.stringify(trimmedUrls, null, 2));\n}\n\nconsole.log(`总条目: ${items.length}, 新条目: ${newItems.length}`);\n\nreturn newItems;"
+      },
+      "name": "去重",
+      "type": "n8n-nodes-base.code",
+      "position": [650, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\n\nconst processedItems = items.map(item => {\n  const data = item.json;\n  const pubDate = new Date(data.pubDate);\n  const dateStr = pubDate.toISOString().split('T')[0];\n  const docName = `HN-${dateStr}-${data.title.slice(0, 50)}`;\n  \n  const docContent = `\n# ${data.title}\n\n**来源**: Hacker News\n**链接**: ${data.link}\n**时间**: ${pubDate.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n## 摘要\n\n${data.content || data.contentSnippet || '无摘要'}\n`.trim();\n\n  return {\n    json: {\n      docName: docName,\n      docContent: docContent,\n      sourceUrl: data.link,\n      pubDate: dateStr\n    }\n  };\n});\n\nreturn processedItems;"
+      },
+      "name": "数据处理",
+      "type": "n8n-nodes-base.code",
+      "position": [850, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal/v1/datasets/YOUR_DATASET_ID/document/create_by_text",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $json.docName }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.docContent }}"
+            },
+            {
+              "name": "indexing_technique",
+              "value": "high_quality"
+            },
+            {
+              "name": "process_rule",
+              "value": "={ \"mode\": \"automatic\" }"
+            }
+          ]
+        },
+        "options": {
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetweenTries": 1000
+          }
+        }
+      },
+      "name": "写入Dify",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1050, 300],
+      "typeVersion": 4.1
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "去重",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "去重": {
+      "main": [
+        [
+          {
+            "node": "数据处理",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "数据处理": {
+      "main": [
+        [
+          {
+            "node": "写入Dify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
