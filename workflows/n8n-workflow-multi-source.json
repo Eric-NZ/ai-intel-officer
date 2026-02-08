@@ -1,0 +1,362 @@
+{
+  "name": "多源采集-GitHub+HN+arXiv",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "name": "HN定时触发",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [200, 100],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "name": "GitHub定时触发",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [200, 400],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "name": "arXiv定时触发",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [200, 700],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "url": "https://hacker-news.firebaseio.com/v0/topstories.json"
+      },
+      "name": "HN Top Stories",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [420, 100],
+      "typeVersion": 4.1
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const storyIds = $input.first().json;\nconst topIds = storyIds.slice(0, 20);\n\nconst stories = [];\nfor (const id of topIds) {\n  const res = await fetch(\n    `https://hacker-news.firebaseio.com/v0/item/${id}.json`\n  );\n  const story = await res.json();\n  if (story && story.url) {\n    stories.push({\n      json: {\n        title: story.title,\n        link: story.url,\n        content: `${story.title} (Score: ${story.score}, Comments: ${story.descendants || 0})`,\n        pubDate: new Date(story.time * 1000).toISOString(),\n        source: 'hackernews-api'\n      }\n    });\n  }\n}\n\nreturn stories;"
+      },
+      "name": "HN解析",
+      "type": "n8n-nodes-base.code",
+      "position": [640, 100],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "url": "https://api.gitterapp.com/repositories?since=daily"
+      },
+      "name": "GitHub Trending",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [420, 400],
+      "typeVersion": 4.1
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  const d = item.json;\n  return {\n    json: {\n      title: `${d.author}/${d.name}`,\n      link: d.url,\n      content: `${d.description || ''} | ⭐${d.stars} | 语言: ${d.language || 'N/A'} | 今日新增: +${d.currentPeriodStars || 0}`,\n      pubDate: new Date().toISOString(),\n      source: 'github'\n    }\n  };\n});"
+      },
+      "name": "GitHub解析",
+      "type": "n8n-nodes-base.code",
+      "position": [640, 400],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "url": "https://rss.arxiv.org/rss/cs.AI"
+      },
+      "name": "arXiv RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [420, 700],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  const d = item.json;\n  return {\n    json: {\n      title: d.title,\n      link: d.link,\n      content: d.content || d.contentSnippet || '',\n      pubDate: d.pubDate || new Date().toISOString(),\n      source: 'arxiv'\n    }\n  };\n});"
+      },
+      "name": "arXiv解析",
+      "type": "n8n-nodes-base.code",
+      "position": [640, 700],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [880, 400],
+      "typeVersion": 2.1
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\n\nconst normalized = items.map(item => {\n  const d = item.json;\n\n  let source = d.source || 'unknown';\n  let title = d.title || d.name || '无标题';\n  let link = d.link || d.url || '';\n  let content = d.content || d.description || d.contentSnippet || '';\n\n  if (d.author && d.stars !== undefined) {\n    source = 'github';\n    title = `[GitHub] ${d.author}/${d.name}`;\n    link = d.url;\n    content = `${d.description || ''} | ⭐${d.stars} | 语言: ${d.language || 'N/A'} | 今日新增: +${d.currentPeriodStars || 0}`;\n  }\n\n  if (link.includes('arxiv.org')) {\n    source = 'arxiv';\n    title = `[论文] ${title}`;\n  }\n\n  const dateStr = new Date(d.pubDate || Date.now()).toISOString().split('T')[0];\n\n  return {\n    json: {\n      source, title, link, content, pubDate: dateStr,\n      docName: `${source.toUpperCase()}-${dateStr}-${title.slice(0, 50)}`,\n      docContent: `# ${title}\\n\\n**来源**: ${source}\\n**链接**: ${link}\\n**时间**: ${dateStr}\\n\\n## 内容\\n\\n${content}`.trim()\n    }\n  };\n});\n\nreturn normalized;"
+      },
+      "name": "统一格式",
+      "type": "n8n-nodes-base.code",
+      "position": [1100, 400],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const fs = require('fs');\nconst crypto = require('crypto');\nconst DB_PATH = '/home/node/.n8n/dedup_db.json';\n\nlet db = { records: {}, stats: { total: 0, dupes: 0 } };\ntry {\n  db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));\n} catch (e) { /* 首次运行 */ }\n\nfunction fingerprint(title) {\n  const clean = title.toLowerCase().replace(/[\\s\\W]+/g, '').slice(0, 60);\n  return crypto.createHash('md5').update(clean).digest('hex').slice(0, 12);\n}\n\nconst items = $input.all();\nconst newItems = [];\nconst now = new Date().toISOString();\n\nfor (const item of items) {\n  const { link, title, source } = item.json;\n\n  if (db.records[link]) { db.stats.dupes++; continue; }\n\n  const fp = `fp:${fingerprint(title)}`;\n  if (db.records[fp]) { db.stats.dupes++; continue; }\n\n  db.records[link] = { source, time: now };\n  db.records[fp] = { source, time: now };\n  db.stats.total++;\n  newItems.push(item);\n}\n\nconst cutoff = new Date(Date.now() - 30 * 86400000).toISOString();\nlet cleaned = 0;\nfor (const [key, val] of Object.entries(db.records)) {\n  if (val.time < cutoff) { delete db.records[key]; cleaned++; }\n}\n\nfs.writeFileSync(DB_PATH, JSON.stringify(db));\n\nconsole.log(`输入: ${items.length} | 新增: ${newItems.length} | 重复: ${items.length - newItems.length} | 清理过期: ${cleaned}`);\n\nreturn newItems.length > 0\n  ? newItems\n  : [{ json: { _empty: true, msg: '本轮无新内容' } }];"
+      },
+      "name": "去重",
+      "type": "n8n-nodes-base.code",
+      "position": [1300, 400],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "undefined"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "有新内容?",
+      "type": "n8n-nodes-base.if",
+      "position": [1500, 400],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal/v1/datasets/YOUR_DATASET_ID/document/create_by_text",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $json.docName }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.docContent }}"
+            },
+            {
+              "name": "indexing_technique",
+              "value": "high_quality"
+            },
+            {
+              "name": "process_rule",
+              "value": "={ \"mode\": \"automatic\" }"
+            }
+          ]
+        },
+        "options": {
+          "retry": {
+            "enabled": true,
+            "maxTries": 3,
+            "waitBetweenTries": 1000
+          },
+          "timeout": 10000
+        }
+      },
+      "name": "写入Dify",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1720, 300],
+      "typeVersion": 4.1
+    }
+  ],
+  "connections": {
+    "HN定时触发": {
+      "main": [
+        [
+          {
+            "node": "HN Top Stories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HN Top Stories": {
+      "main": [
+        [
+          {
+            "node": "HN解析",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HN解析": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub定时触发": {
+      "main": [
+        [
+          {
+            "node": "GitHub Trending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Trending": {
+      "main": [
+        [
+          {
+            "node": "GitHub解析",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub解析": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "arXiv定时触发": {
+      "main": [
+        [
+          {
+            "node": "arXiv RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "arXiv RSS": {
+      "main": [
+        [
+          {
+            "node": "arXiv解析",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "arXiv解析": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "统一格式",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "统一格式": {
+      "main": [
+        [
+          {
+            "node": "去重",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "去重": {
+      "main": [
+        [
+          {
+            "node": "有新内容?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "有新内容?": {
+      "main": [
+        [
+          {
+            "node": "写入Dify",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  }
+}
