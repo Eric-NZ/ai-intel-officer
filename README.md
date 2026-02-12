@@ -28,6 +28,7 @@ docker compose up -d
 | `docker-compose.yml` | n8n 服务配置 |
 | `.env.example` | 环境变量模板 |
 | `workflows/n8n-workflow-rss.json` | RSS 采集工作流（第 4 篇配套） |
+| `workflows/n8n-workflow-multi-source.json` | 多源采集 + 智能去重工作流（第 5 篇配套） |
 
 ## 访问地址
 
