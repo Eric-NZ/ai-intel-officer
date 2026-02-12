@@ -40,3 +40,9 @@ docker compose up -d
 ## 系列教程
 
 详见：[AI 情报员系列文章](https://mp.weixin.qq.com/mp/appmsgalbum?__biz=MzAwNzAxNDY0MA==&action=getalbum&album_id=4344831897529696260#wechat_redirect)
+
+## 关注作者
+
+![微信搜一搜：程序员义拉冠](assets/wechat-search-qrcode.jpg)
+
+微信搜一搜「**程序员义拉冠**」，获取最新教程推送。
