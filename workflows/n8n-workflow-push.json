@@ -1,0 +1,156 @@
+{
+  "name": "AI情报员-每日推送",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 0,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "每天早8点(UTC+8=UTC0点)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-dify-domain/v1/workflows/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"inputs\": {\n    \"date\": \"{{ $now.format('yyyy-MM-dd') }}\",\n    \"categories\": \"大模型,开源工具,行业动态,技术教程\",\n    \"max_items\": 20\n  },\n  \"response_mode\": \"blocking\",\n  \"user\": \"daily-push\"\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "dify-api",
+      "name": "调用Dify简报API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Dify API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.outputs.report }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-check",
+      "name": "简报是否正常",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sctapi.ftqq.com/YOUR_SENDKEY.send",
+        "sendBody": true,
+        "specifyBody": "string",
+        "bodyContentType": "multipart-form-data",
+        "body": "title=AI情报日报 {{ $now.format('MM-dd') }}&desp={{ encodeURIComponent($json.data.outputs.report) }}",
+        "options": {}
+      },
+      "id": "serverchan",
+      "name": "Server酱推送(微信)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, -100],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "fromEmail": "your_email@qq.com",
+        "toEmail": "your_email@qq.com",
+        "subject": "=AI情报日报 {{ $now.format('yyyy-MM-dd') }}",
+        "text": "={{ $json.data.outputs.report }}",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "邮件推送",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [660, 100],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "QQ邮箱SMTP"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sctapi.ftqq.com/YOUR_SENDKEY.send",
+        "sendBody": true,
+        "specifyBody": "string",
+        "bodyContentType": "multipart-form-data",
+        "body": "title=[告警] AI情报员故障&desp=简报生成失败，请检查 Dify 服务和 API Key。时间：{{ $now.format('yyyy-MM-dd HH:mm') }}",
+        "options": {}
+      },
+      "id": "alert",
+      "name": "故障告警",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300]
+    }
+  ],
+  "connections": {
+    "每天早8点(UTC+8=UTC0点)": {
+      "main": [[{ "node": "调用Dify简报API", "type": "main", "index": 0 }]]
+    },
+    "调用Dify简报API": {
+      "main": [[{ "node": "简报是否正常", "type": "main", "index": 0 }]]
+    },
+    "简报是否正常": {
+      "main": [
+        [
+          { "node": "Server酱推送(微信)", "type": "main", "index": 0 },
+          { "node": "邮件推送", "type": "main", "index": 0 }
+        ],
+        [{ "node": "故障告警", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateId": "ai-intel-officer-push",
+    "instanceId": "ai-intel-officer"
+  }
+}

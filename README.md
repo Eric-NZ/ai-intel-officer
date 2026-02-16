@@ -29,6 +29,9 @@ docker compose up -d
 | `.env.example` | 环境变量模板 |
 | `workflows/n8n-workflow-rss.json` | RSS 采集工作流（第 4 篇配套） |
 | `workflows/n8n-workflow-multi-source.json` | 多源采集 + 智能去重工作流（第 5 篇配套） |
+| `workflows/n8n-workflow-push.json` | 每日推送工作流 - Server酱 + 邮件（第 7 篇配套） |
+| `scripts/generate_report.py` | 简报生成 API 调用示例（第 6 篇配套） |
+| `scripts/backup.sh` | 系统备份脚本（第 9 篇配套） |
 
 ## 访问地址
 
